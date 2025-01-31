@@ -1,0 +1,91 @@
+{
+    "asset" : {
+        "generator" : "Khronos glTF Blender I/O v3.3.27",
+        "version" : "2.0"
+    },
+    "scene" : 0,
+    "scenes" : [
+        {
+            "name" : "Scene",
+            "nodes" : [
+                0
+            ]
+        }
+    ],
+    "nodes" : [
+        {
+            "mesh" : 0,
+            "name" : "Utah_teapot_(solid)"
+        }
+    ],
+    "meshes" : [
+        {
+            "name" : "Utah_teapot_(solid)",
+            "primitives" : [
+                {
+                    "attributes" : {
+                        "POSITION" : 0,
+                        "NORMAL" : 1
+                    },
+                    "indices" : 2
+                }
+            ]
+        }
+    ],
+    "accessors" : [
+        {
+            "bufferView" : 0,
+            "componentType" : 5126,
+            "count" : 28309,
+            "max" : [
+                9.41236686706543,
+                8.571527481079102,
+                5.369760513305664
+            ],
+            "min" : [
+                -8.16388988494873,
+                2.2351741790771484e-08,
+                -5.557277679443359
+            ],
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 1,
+            "componentType" : 5126,
+            "count" : 28309,
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 2,
+            "componentType" : 5123,
+            "count" : 28314,
+            "type" : "SCALAR"
+        }
+    ],
+    "bufferViews" : [
+        {
+            "buffer" : 0,
+            "byteLength" : 339708,
+            "byteOffset" : 0,
+            "target" : 34962
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 339708,
+            "byteOffset" : 339708,
+            "target" : 34962
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 56628,
+            "byteOffset" : 679416,
+            "target" : 34963
+        }
+    ],
+    "buffers" : [
+        {
+            "byteLength" : 736044,
+            "uri" : "teapot.bin"
+        }
+    ]
+}
