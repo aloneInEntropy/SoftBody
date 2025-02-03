@@ -21,8 +21,9 @@ void init() {
 
     // startLight->addSpotLightAtt(vec3(-20, -1, -5), Util::RIGHT, vec3(0.2f), vec3(1), vec3(1));
     startLight->addPointLightAtt(lightPos, vec3(0.2f), vec3(1), vec3(1));
+    sbLight->addDirLightAtt(Util::DOWN, vec3(0.2f), vec3(0.2f), vec3(1));
     sbLight->addPointLightAtt(lightPos, vec3(0.2f), vec3(1), vec3(1));
-    // startLight->addDirLightAtt(Util::DOWN, vec3(0.2f), vec3(0.2f), vec3(1));
+    startLight->addDirLightAtt(Util::DOWN, vec3(0.2f), vec3(0.2f), vec3(1));
 
     SM::startTime = timeGetTime();
 }
@@ -39,16 +40,16 @@ void display() {
     mat4 view = SM::camera->getViewMatrix();
     mat4 projection = SM::camera->getPerspectiveMatrix();
 
-    startLight->use();
-    startLight->setLightAtt(view, projection, SM::camera->pos);
-    startLight->setPointLightAtt(0, lightPos);
-    startMeshB->render(translate(mat4(1), vec3(0, 1, -5)));
+    // startLight->use();
+    // startLight->setLightAtt(view, projection, SM::camera->pos);
+    // startLight->setPointLightAtt(0, lightPos);
+    // startMeshB->render(translate(mat4(1), vec3(0, 1, -5)));
 
     sbLight->use();
     sbLight->setLightAtt(view, projection, SM::camera->pos);
     sbLight->setPointLightAtt(0, lightPos);
     sbLight->shader->setVec3("colour", vec3(1));
-    sb->mesh->render(translate(mat4(1), vec3(0, -1, -5)));
+    sb->mesh->render(translate(mat4(1), vec3(0, 10, -5)));
 
     lightShader->use();
     lightShader->setVec3("viewPos", SM::camera->pos);
@@ -63,6 +64,7 @@ void update() {
     if (!SM::debug) {
         SM::camera->processMovement();
     }
+    sb->update();
     SM::updateTick();
 }
 
@@ -74,10 +76,14 @@ void displayUI() {
     auto io = ImGui::GetIO();
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
     ImGui::Text("MP: %.0f, %.0f", SM::mouse.x, SM::mouse.y);
-    if (ImGui::SliderFloat3("Camera Position", &SM::camera->pos.x, -10, 10)) {
-        SM::camera->updateViewMatrix();
-    }
+    // if (ImGui::SliderFloat3("Camera Position", &SM::camera->pos.x, -10, 10)) {
+    //     SM::camera->updateViewMatrix();
+    // }
     ImGui::SliderFloat3("Light Position", &lightPos.x, -10, 10);
+    ImGui::SliderFloat("Gravity", &sb->gravity, 0, 1000);
+    ImGui::SliderFloat("Edge Compliance", &sb->edgeCompliance, 0, 1);
+    ImGui::SliderFloat("Volume Compliance", &sb->volumeCompliance, 0, 1);
+    ImGui::SliderFloat("Floor Y", &sb->floorY, -50, 10);
     ImGui::End();
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -91,7 +97,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
             glfwSetWindowShouldClose(window, true);
         }
-        if (key == GLFW_KEY_LEFT_ALT && action == GLFW_PRESS) {
+        if (key == GLFW_KEY_LEFT_ALT && action == GLFW_RELEASE) {
             SM::debug = !SM::debug;
         }
         if (key == GLFW_KEY_LEFT_SHIFT) SM::camera->DOWN = action == GLFW_REPEAT || action == GLFW_PRESS;
@@ -171,7 +177,7 @@ int main(int argc, char const* argv[]) {
     io.FontGlobalScale = 1.5;
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
-
+    // raise(SIGTRAP);
     init();
     // Main Loop
     while (!glfwWindowShouldClose(window)) {

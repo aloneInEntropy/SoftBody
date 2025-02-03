@@ -3,6 +3,8 @@
 
 #include <fstream>
 #include <iostream>
+#include <execution>
+#include <set>
 
 #include "util.h"
 #include "staticmesh.h"
@@ -20,105 +22,98 @@ class SoftBody {
         name = nm;
         mesh = new StaticMesh();
         mesh->name = nm + "_Static";
-        // mesh->useCustomVertices = true; // enable use of custom vertices
+        mesh->useCustomVertices = true; // enable use of custom vertices
         mesh->loadMesh(meshPath);
         loadTetraFile();
+
+        tetraCount = tetras.size();
+        tVertexCount = vertices.size();
+        mVertexCount = mesh->vertices.size();
+        tvIndices.resize(tVertexCount);
+        mvIndices.resize(mVertexCount);
+        tetraMap.resize(mVertexCount);
+        std::iota(tvIndices.begin(), tvIndices.end(), 0);  // set to 0, 1, 2, ..., tVertexCount
+        std::iota(mvIndices.begin(), mvIndices.end(), 0);  // set to 0, 1, 2, ..., mVertexCount
+        initHash();
+        initPhysics();
+        // Util::print(startIndices);
+        // Util::print(cellEntries);
+        computeSkinningInfo();
+        // updateVisualMesh();
+        bounds = {50, 50, 50};
     }
 
-    void loadTetraFile() {
-        tetraPath = TETRAPATH(mesh->mesh_path);
-        std::ifstream file(tetraPath);
-        if (!file.is_open()) {
-            std::cout << "Failed to open file " << tetraPath << std::endl;
-            return;
-        }
+    void loadTetraFile();
+    float computeTetraVolume(int t);
+    float computeTetraVolume(vec3 p1, vec3 p2, vec3 p3, vec3 p4);
+    void update();
+    void computeSkinningInfo();
+    int getHashedKey(ivec3 cell);
+    ivec3 getCellCoord(vec3 p);
+    void updateSpatialLookup();
+    void queryNearbyMV(vec3 p, float r);
+    void initHash();
+    void initPhysics();
+    void applyForces();
+    void constrainBounds();
+    void solveEdgeConstraint();
+    void solveVolumeConstraint();
+    void updateVisualMesh();
 
-        std::string line;
-        int idx = 1;
-        int vs = 0, es = 0, fs = 0, ts = 0, tns = 0;
-        while (getline(file, line)) {
-            std::vector<std::string> vals = Util::split(line, " ");
-            if (idx == 1) {
-                vs = stoi(vals[1]);
-                vertices.reserve(vs);
-            } else if (idx == 2) {
-                es = stoi(vals[1]);
-                edges.reserve(es);
-            } else if (idx == 3) {
-                fs = stoi(vals[1]);
-                faces.reserve(fs);
-            } else if (idx == 4) {
-                ts = stoi(vals[1]);
-                tetras.reserve(ts);
-            } else if (idx == 5) {
-                tns = stoi(vals[1]);
-                tetraNeighbours.reserve(tns);
-            } else {
-                std::string type = vals[0];
-                if (type == "v") {
-                    vertices.push_back({
-                        stof(vals[1]),
-                        stof(vals[2]),
-                        stof(vals[3]),
-                    });
-                } else if (type == "e") {
-                    edges.push_back({
-                        stoi(vals[1]),
-                        stoi(vals[2]),
-                    });
-                } else if (type == "f") {
-                    faces.push_back({
-                        stoi(vals[1]),
-                        stoi(vals[2]),
-                        stoi(vals[3]),
-                    });
-                } else if (type == "t") {
-                    tetras.push_back({
-                        stoi(vals[1]),
-                        stoi(vals[2]),
-                        stoi(vals[3]),
-                        stoi(vals[4]),
-                    });
-                } else if (type == "tn") {
-                    tetraNeighbours.push_back({
-                        stoi(vals[1]),
-                        stoi(vals[2]),
-                        stoi(vals[3]),
-                        stoi(vals[4]),
-                    });
-                }
-            }
+    struct Vertex {
+        int vID;
+        vec3 position;
+        vec3 velocity = vec3(0);
+        float invMass = 0;
+        Vertex(int id, vec3 pos) : vID(id), position(pos) {}
+    };
 
-            idx++;
-        }
-        assert(vertices.size() == vs && "mismatched vertex count");
-        assert(edges.size() == es && "mismatched edges count");
-        assert(faces.size() == fs && "mismatched faces count");
-        assert(tetras.size() == ts && "mismatched tetrahedra count");
-        assert(tetraNeighbours.size() == tns && "mismatched tetra neighbour count");
+    struct Edge {
+        int eID;
+        int x1, x2;
+        float restLength = 0;  // edge length
+        Edge(int id, int a, int b) : eID(id), x1(a), x2(b) {}
+    };
 
-        file.close();
-        printf("Successfully loaded tetrahedral mesh \"%s.tetra\"\n", MODEL_NO_DIR(mesh->mesh_path).c_str());
-        return;
-    }
+    struct Tetra {
+        int tID;
+        int x1, x2, x3, x4;
+        float restVolume = 0;  // rest volume
+        Tetra(int id, int w, int x, int y, int z) : tID(id), x1(w), x2(x), x3(y), x4(z) {}
+    };
 
-    void update() {
+    StaticMesh* mesh;                            // mesh to base the soft body from
+    std::vector<Vertex> vertices;                // tetrahedra vertices
+    std::vector<Edge> edges;                     // tetrahedra edges
+    std::vector<Tetra> tetras;                   // tetrahedra
+    std::vector<std::pair<int, vec3>> tetraMap;  // mapping of visual mesh vertices to tetrahedra IDs and their (3D) barycentric coords
+    std::vector<std::tuple<int, int, int, int>> tetraNeighbours;
 
-    }
+    float edgeCompliance = 100;
+    float volumeCompliance = 100;
+    float cellSize = 0.05;  // grid size for particles. in 3D, particles are single points rather than spheres with radii
+    float dt = 1.f / 120;
+    float sdt = dt / substeps;
+    int substeps = 4;
+    float gravity = 10;
+    int tVertexCount = 0;  // tetrahedral mesh vertex count
+    int mVertexCount = 0;  // visual mesh vertex count
+    int tetraCount = 0;    // tetrahedra count
+    vec3 bounds;
+    float floorY = -20;
 
-    using Edge = ivec2;
-    using Face = ivec3;
-    using Tetra = std::tuple<unsigned, unsigned, unsigned, unsigned>;
-    StaticMesh* mesh;
-    std::vector<vec3> vertices;
-    std::vector<Edge> edges;
-    std::vector<Face> faces;
-    std::vector<Tetra> tetras;
-    std::vector<std::tuple<unsigned, unsigned, unsigned, unsigned>> tetraNeighbours;
+    std::vector<int> tvIndices;  // indices of tetrahedral mesh
+    std::vector<int> mvIndices;  // indices of visual mesh
+
+    /* Hash variables */
+    int tableSize = 0;
+    int querySize = 0;
+    std::set<int> queryIDs;  // temporary buffer for querying nearby visual mesh particles
+    std::vector<int> startIndices; // start indices of 
+    std::vector<int> cellEntries;
 
     std::string name;
     std::string tetraPath;
 };
-
 
 #endif /* SOFTBODY_H */

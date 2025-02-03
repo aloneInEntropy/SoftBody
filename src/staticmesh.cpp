@@ -218,9 +218,12 @@ void StaticMesh::populateBuffers() {
     glVertexAttribDivisor(ST_DEPTH_LOC, 1);  // tell OpenGL this is an instanced vertex attribute.
 }
 
-void StaticMesh::setCustomVertices(std::vector<vec3> vs) { 
-    assert(vs.size() == vertices.size() && "attempted to set invalid amount of custom vertices");
-    cVertices = vs; 
+// Set custom vertices for this mesh. Will only run if `useCustomVertices` is enabled.
+// The size of `vs` MUST be equal to the size of the vertices loaded for this mesh. The program will crash if not
+void StaticMesh::setCustomVertices(std::vector<vec3> vs) {
+    // if (!useCustomVertices) return;
+    // assert(vs.size() == vertices.size() && "attempted to set invalid amount of custom vertices");
+    // cVertices = vs; 
 }
 
 /// <summary>
@@ -234,12 +237,14 @@ void StaticMesh::render(unsigned int nInstances, const mat4* model_matrix, const
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(mat4) * nInstances, &model_matrix[0]);
     if (useCustomVertices) {
         glBindBuffer(GL_ARRAY_BUFFER, p_VBO);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec3) * cVertices.size(), &cVertices[0]);
-    } else {
-        // in case useCustomVertices is disabled after being enabled
-        glBindBuffer(GL_ARRAY_BUFFER, p_VBO);
+        // glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec3) * cVertices.size(), &cVertices[0]);
         glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec3) * vertices.size(), &vertices[0]);
-    }
+    } 
+    // else {
+    //     // in case useCustomVertices is disabled after being enabled
+    //     glBindBuffer(GL_ARRAY_BUFFER, p_VBO);
+    //     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec3) * vertices.size(), &vertices[0]);
+    // }
     for (unsigned int i = 0; i < meshes.size(); i++) {
         unsigned int mIndex = meshes[i].materialIndex;
         assert(mIndex < materials.size());
