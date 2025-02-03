@@ -83,105 +83,46 @@ void SoftBody::loadTetraFile() {
     return;
 }
 
-int SoftBody::getHashedKey(ivec3 cell) {
-    int sum = (cell.x * 854807) ^ (cell.y * 618361) ^ (cell.z * 553757);
-    return abs(sum) % tableSize;
+long long SoftBody::getHashKey(ivec3 cell) {
+    long long s = (cell.x * 6096427489LL) + (cell.y * 4039848257LL) + (cell.z * 5993801789LL);
+    return s;
 }
 
 ivec3 SoftBody::getCellCoord(vec3 p) {
     return ivec3(floor(p.x / cellSize), floor(p.y / cellSize), floor(p.z / cellSize));
 }
 
+// populate the cell to mesh map
 void SoftBody::initHash() {
-    tableSize = mVertexCount * 1;
-    startIndices.resize(tableSize + 1, 0);
-    cellEntries.resize(mVertexCount, 0);
-    // queryIDs.resize(mVertexCount, 0);
-    querySize = 0;
-
-    updateSpatialLookup();
-}
-
-// update cellEntries and startIndices tables for hashed visual mesh vertices
-void SoftBody::updateSpatialLookup() {
-    // compute cell counts
     std::for_each(std::execution::par, mvIndices.begin(), mvIndices.end(), [&](auto&& i) {
         vec3 mv = mesh->vertices[i];
         ivec3 cell = getCellCoord(mv);
-        int key = getHashedKey(cell);
-        startIndices[key]++;
-    });
-
-    // compute partial sum
-    int s = 0;
-    for (int i = 0; i < tableSize; ++i) {
-        s += startIndices[i];
-        startIndices[i] = s;
-    }
-    startIndices[tableSize] = s;
-
-    // compute cell entries for each mesh vertex
-    std::for_each(std::execution::par, mvIndices.begin(), mvIndices.end(), [&](auto&& i) {
-        vec3 mv = mesh->vertices[i];
-        ivec3 cell = getCellCoord(mv);
-        int key = getHashedKey(cell);
-        startIndices[key]--;
-        cellEntries[startIndices[key]] = i;
+        long long key = getHashKey(cell);
+        cellToVis[key].push_back(i);
     });
 }
 
 // query all visual mesh vertices near the point `p` within a radius `r`
 void SoftBody::queryNearbyMV(vec3 p, float r) {
-    // todo: fix querySize becoming too large
-    // ? probably related to the search radius, as `i` also increases very rapidly
-    // todo: look into why z values are always positive (maybe undo rotation in blender?)
-
     querySize = 0;
     queryIDs.clear();
     ivec3 lcell = getCellCoord(p - r);
     ivec3 hcell = getCellCoord(p + r);
-    // Util::print(vec3(lcell));
-    // Util::print(vec3(hcell));
-    int i = 0;
     for (int x = lcell.x; x <= hcell.x; ++x) {
         for (int y = lcell.y; y <= hcell.y; ++y) {
             for (int z = lcell.z; z <= hcell.z; ++z) {
                 ivec3 cell = {x, y, z};             // create cell
-                int key = getHashedKey(cell);  // get cell hash
-                int start = startIndices[key];      // get start index of values in cell
-                int end = startIndices[key + 1];    // get end index
-                for (int j = start; j < end; ++j) {
-                    // add mesh vertex ids to queryID list
-                    queryIDs.insert(cellEntries[j]);
-                    // queryIDs[querySize] = cellEntries[j];
-                    // querySize++;
-                    // if (querySize >= 800) {
-                    //     Util::print(p - r);
-                    //     Util::print(p);
-                    //     Util::print(p + r);
-                    //     Util::print(vec3(getCellCoord(p - r)));
-                    //     Util::print(vec3(getCellCoord(p)));
-                    //     Util::print(vec3(getCellCoord(p + r)));
-                    //     Util::print(vec3(cell));
-                    //     printf("%d, %d, %d, %u, %d, %f, %d\n\n", start, j, end, key, querySize, r, i);
-                    //     // printf("\n\n");
-                    //     for (int i = 0; i < querySize; ++i) {
-                    //         vec3 vv = mesh->vertices[cellEntries[queryIDs[i]]];
-                    //         Util::print(vv);
-                    //         // Util::print(vec3(getCellCoord(vv)));
-                    //         printf("%f --- %d\n", distance(p, vv), cellEntries[queryIDs[i]]);
-                    //     }
-                    //     exit(1);
-                    //     // return;
-                    // }
+                auto key = getHashKey(cell); // get cell hash
+                for (auto id: cellToVis[key]) {
+                    if (auto [it, ins] = queryIDs.insert(id); !ins) printf("collision"); // debug
                 }
-                i++;
             }
         }
     }
 }
 
 void SoftBody::initPhysics() {
+    previousPositions.resize(vertices.size());
     for (auto& tet : tetras) {
         float vol = computeTetraVolume(tet.tID);
         tet.restVolume = vol;
@@ -219,14 +160,15 @@ float SoftBody::computeTetraVolume(vec3 p1, vec3 p2, vec3 p3, vec3 p4) {
 
 // create a hashed position for each mesh vertex
 void SoftBody::computeSkinningInfo() {
+    // for (const auto& [key, value] : cellToVis)
+    //     std::cout << '[' << key << "] = " << value.size() << "; " << std::endl;
     const std::vector<vec3>& mvs = mesh->vertices;
     std::vector<float> minDist(mVertexCount, std::numeric_limits<float>::max());
     vec3 tCentre = vec3(0);
     mat3 P = mat3(0);
     vec4 bary = vec4(0);
-
+    int cnt = 0;
     std::for_each(std::execution::par, tetras.begin(), tetras.end(), [&](auto&& tet) {
-    // for (auto tet: tetras) {
         vec3 p1 = vertices[tet.x1].position;
         vec3 p2 = vertices[tet.x2].position;
         vec3 p3 = vertices[tet.x3].position;
@@ -244,8 +186,7 @@ void SoftBody::computeSkinningInfo() {
         maxRadius += cellSize;
 
         queryNearbyMV(tCentre, maxRadius);
-        // Util::print(tCentre);
-        // if (querySize == 0) return;
+        if (queryIDs.empty()) return;
 
         // create matrix from vertices, subtracting the contrained point `p4`
         vec3 x14 = p1 - p4;
@@ -254,14 +195,13 @@ void SoftBody::computeSkinningInfo() {
         P = mat3(x14, x24, x34);
         P = inverse(P); // v - p4 = Pb ==> b = inv(P)(v - p4)
 
-        std::for_each(std::execution::par, queryIDs.begin(), queryIDs.end(), [&](auto&& id) {
+        std::for_each(queryIDs.begin(), queryIDs.end(), [&](auto&& id) {
             int mID = id; // visual mesh vertex ID
             vec3 v = mesh->vertices[mID];
 
             if (minDist[mID] <= 0) return; // already have skinning info (dist is negative or 0)
             if (distance(v, tCentre) > maxRadius) return; // outside search radius
-            // printf("%f, %f\n", distance(v, tCentre), maxRadius);
-
+            cnt++;
             // compute barycentric coordinates
             vec3 vp_4 = v - p4;
             vec3 b = P * vp_4;
@@ -279,7 +219,6 @@ void SoftBody::computeSkinningInfo() {
             }
         });
     });
-    // }
 }
 
 void SoftBody::solveEdgeConstraint() {
@@ -291,8 +230,8 @@ void SoftBody::solveEdgeConstraint() {
         float C = l - e.restLength;
         vec3 dxi = normalize(offset_i);  // constraint gradient for i
         vec3 dxj = normalize(offset_j);  // constraint gradient for j
-        float denom = (vertices[e.x1].invMass * length2(dxi)) +
-                      (vertices[e.x2].invMass * length2(dxj)) +
+        float denom = (vertices[e.x1].invMass) +
+                      (vertices[e.x2].invMass) +
                       (edgeCompliance / (sdt * sdt));
         // denom += 1e-3f;  // to avoid division by 0. also needs the timestep needs to be low enough to avoid NaN values
         float lambda = -C / denom;
@@ -343,14 +282,13 @@ void SoftBody::updateVisualMesh() {
 void SoftBody::applyForces() {
     std::for_each(std::execution::par, vertices.begin(), vertices.end(), [&](auto&& v) {
         if (v.invMass == 0) return;
-        v.velocity = Util::DOWN * gravity * sdt;
+        v.velocity += Util::DOWN * gravity * sdt;
     });
 }
 
 void SoftBody::constrainBounds() {
     for (auto& v : vertices) {
         if (v.position.y < floorY) v.position.y = floorY;
-        // if (v.position.y<floorY || v.position.y> - floorY) v.position.y = floorY;
     }
 }
 
@@ -358,13 +296,18 @@ void SoftBody::update() {
     sdt = dt / substeps;
     for (int i = 0; i < substeps; ++i) {
         applyForces();
-        std::for_each(std::execution::par, vertices.begin(), vertices.end(), [&](auto&& v) {
-            if (v.invMass == 0) return;
-            v.position += v.velocity * sdt;
+        std::for_each(std::execution::par, tvIndices.begin(), tvIndices.end(), [&](auto&& i) {
+            if (vertices[i].invMass == 0) return;
+            previousPositions[i] = vertices[i].position;
+            vertices[i].position += vertices[i].velocity * sdt;
         });
         solveEdgeConstraint();
         solveVolumeConstraint();
+        std::for_each(std::execution::par, tvIndices.begin(), tvIndices.end(), [&](auto&& i) {
+            if (vertices[i].invMass == 0) return;
+            vertices[i].velocity = (vertices[i].position - previousPositions[i]) / sdt;
+        });
         constrainBounds();
-    updateVisualMesh();
     }
+    updateVisualMesh();
 }

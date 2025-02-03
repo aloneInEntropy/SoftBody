@@ -5,6 +5,7 @@
 #include <iostream>
 #include <execution>
 #include <set>
+#include <list>
 
 #include "util.h"
 #include "staticmesh.h"
@@ -36,10 +37,7 @@ class SoftBody {
         std::iota(mvIndices.begin(), mvIndices.end(), 0);  // set to 0, 1, 2, ..., mVertexCount
         initHash();
         initPhysics();
-        // Util::print(startIndices);
-        // Util::print(cellEntries);
         computeSkinningInfo();
-        // updateVisualMesh();
         bounds = {50, 50, 50};
     }
 
@@ -48,9 +46,8 @@ class SoftBody {
     float computeTetraVolume(vec3 p1, vec3 p2, vec3 p3, vec3 p4);
     void update();
     void computeSkinningInfo();
-    int getHashedKey(ivec3 cell);
+    long long getHashKey(ivec3 cell);
     ivec3 getCellCoord(vec3 p);
-    void updateSpatialLookup();
     void queryNearbyMV(vec3 p, float r);
     void initHash();
     void initPhysics();
@@ -91,16 +88,16 @@ class SoftBody {
 
     float edgeCompliance = 100;
     float volumeCompliance = 100;
-    float cellSize = 0.05;  // grid size for particles. in 3D, particles are single points rather than spheres with radii
+    float cellSize = 0.1;  // grid size for particles. in 3D, particles are single points rather than spheres with radii
     float dt = 1.f / 120;
     float sdt = dt / substeps;
     int substeps = 4;
-    float gravity = 10;
+    float gravity = 0;
     int tVertexCount = 0;  // tetrahedral mesh vertex count
     int mVertexCount = 0;  // visual mesh vertex count
     int tetraCount = 0;    // tetrahedra count
     vec3 bounds;
-    float floorY = -20;
+    float floorY = 0;
 
     std::vector<int> tvIndices;  // indices of tetrahedral mesh
     std::vector<int> mvIndices;  // indices of visual mesh
@@ -109,8 +106,8 @@ class SoftBody {
     int tableSize = 0;
     int querySize = 0;
     std::set<int> queryIDs;  // temporary buffer for querying nearby visual mesh particles
-    std::vector<int> startIndices; // start indices of 
-    std::vector<int> cellEntries;
+    std::map<long long, std::list<int>> cellToVis; // mapping of grid cell hashes to visual mesh vertex IDs
+    std::vector<vec3> previousPositions; // previous positions of tetrahedral vertices
 
     std::string name;
     std::string tetraPath;
