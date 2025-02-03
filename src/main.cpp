@@ -80,9 +80,9 @@ void displayUI() {
     //     SM::camera->updateViewMatrix();
     // }
     ImGui::SliderFloat3("Light Position", &lightPos.x, -10, 10);
-    ImGui::SliderFloat("Gravity", &sb->gravity, -10, 10);
-    ImGui::SliderFloat("Edge Compliance", &sb->edgeCompliance, 0, 1);
-    ImGui::SliderFloat("Volume Compliance", &sb->volumeCompliance, 0, 1);
+    ImGui::SliderFloat("Gravity", &sb->gravity, -50, 50);
+    ImGui::SliderFloat("Edge Compliance", &sb->edgeCompliance, 0, 10);
+    // ImGui::SliderFloat("Volume Compliance", &sb->volumeCompliance, 0, 1); // should stay at 0 for stability
     ImGui::SliderFloat("Floor Y", &sb->floorY, -50, 10);
     ImGui::End();
     ImGui::Render();

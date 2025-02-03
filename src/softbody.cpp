@@ -287,9 +287,12 @@ void SoftBody::applyForces() {
 }
 
 void SoftBody::constrainBounds() {
-    for (auto& v : vertices) {
-        if (v.position.y < floorY) v.position.y = floorY;
-    }
+    std::for_each(std::execution::par, tvIndices.begin(), tvIndices.end(), [&](auto&& i) {
+        if (vertices[i].position.y < floorY) {
+            vertices[i].position = previousPositions[i];
+            vertices[i].position.y = floorY;
+        }
+    });
 }
 
 void SoftBody::update() {
@@ -301,13 +304,13 @@ void SoftBody::update() {
             previousPositions[i] = vertices[i].position;
             vertices[i].position += vertices[i].velocity * sdt;
         });
+        constrainBounds();
         solveEdgeConstraint();
         solveVolumeConstraint();
         std::for_each(std::execution::par, tvIndices.begin(), tvIndices.end(), [&](auto&& i) {
             if (vertices[i].invMass == 0) return;
             vertices[i].velocity = (vertices[i].position - previousPositions[i]) / sdt;
         });
-        constrainBounds();
     }
     updateVisualMesh();
 }

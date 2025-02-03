@@ -86,12 +86,12 @@ class SoftBody {
     std::vector<std::pair<int, vec3>> tetraMap;  // mapping of visual mesh vertices to tetrahedra IDs and their (3D) barycentric coords
     std::vector<std::tuple<int, int, int, int>> tetraNeighbours;
 
-    float edgeCompliance = 100;
-    float volumeCompliance = 100;
+    float edgeCompliance = 1;
+    float volumeCompliance = 0;
     float cellSize = 0.1;  // grid size for particles. in 3D, particles are single points rather than spheres with radii
     float dt = 1.f / 120;
     float sdt = dt / substeps;
-    int substeps = 4;
+    int substeps = 10;
     float gravity = 0;
     int tVertexCount = 0;  // tetrahedral mesh vertex count
     int mVertexCount = 0;  // visual mesh vertex count
@@ -106,7 +106,7 @@ class SoftBody {
     int tableSize = 0;
     int querySize = 0;
     std::set<int> queryIDs;  // temporary buffer for querying nearby visual mesh particles
-    std::map<long long, std::list<int>> cellToVis; // mapping of grid cell hashes to visual mesh vertex IDs
+    std::map<long long, std::list<int>> cellToVis; // sparse mapping of grid cell hashes to visual mesh vertex IDs
     std::vector<vec3> previousPositions; // previous positions of tetrahedral vertices
 
     std::string name;

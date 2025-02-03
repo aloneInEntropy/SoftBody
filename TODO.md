@@ -6,4 +6,4 @@
 - [ ] experiment with further decimated tetrahedral mesh
 - [ ] fix breakage when flattened too much
 - [ ] User control using mouse rays
-
+- [ ] copy to visual studio
